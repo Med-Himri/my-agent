@@ -4,3 +4,5 @@ notes.json
 .env
 workspace/*
 !workspace/.gitkeep
+reel-agent/work/
+node_modules/
