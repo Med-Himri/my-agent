@@ -35,7 +35,7 @@ def _is_exhausted(r: requests.Response) -> bool:
 
 
 def speak(text: str, out: Path, previous_text: str = "", next_text: str = "",
-          voice_id: str = BRIAN, speed: float = 1.1) -> Path:
+          voice_id: str = BRIAN, speed: float = 1.0) -> Path:
     """Generate one scene's voice clip. previous/next text keep the intonation continuous across scenes."""
     payload = {
         "text": text,
