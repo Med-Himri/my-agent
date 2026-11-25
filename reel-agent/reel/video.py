@@ -13,9 +13,12 @@ from pathlib import Path
 from PIL import Image, ImageEnhance, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent
-GAP = 0.35          # pause between scenes (s)
+GAP = 0.10          # pause between scenes (s)
+TEMPO = 1.12        # speed-up applied to the voice (pitch unchanged)
+MAX_PAUSE = 0.15    # longest pause kept inside a voice clip (s)
+MUSIC = ROOT / "assets" / "music" / "background.mp3"
 TAIL = 0.9          # hold on last frame (s)
-WORDS_PER_SEC = 2.4  # only used when a scene has no voice clip yet
+WORDS_PER_SEC = 2.9  # only used when a scene has no voice clip yet
 SUB_SPLIT = re.compile(r"(?<=[،,.؟?!:])\s+")
 
 
@@ -23,6 +26,14 @@ def duration(path: Path) -> float:
     out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
                          capture_output=True, text=True, check=True)
     return float(out.stdout.strip())
+
+
+def tighten_voice(src: Path, dst: Path) -> Path:
+    """Cut long pauses, trim edges and speed the voice up a little."""
+    af = (f"silenceremove=start_periods=1:start_threshold=-45dB:stop_periods=-1:stop_duration={MAX_PAUSE}"
+          f":stop_threshold=-45dB:stop_silence={MAX_PAUSE},atempo={TEMPO}")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-af", af, "-ar", "48000", str(dst)], check=True)
+    return dst
 
 
 def strip_marks(s: str) -> str:
@@ -78,6 +89,7 @@ def build_timeline(spec_path: Path) -> dict:
     for i, s in enumerate(spec["scenes"], 1):
         clip = base / "voice" / f"s{i}.mp3"
         if clip.exists():
+            clip = tighten_voice(clip, work / f"voice_s{i}.wav")
             dur = duration(clip); audio.append((clip, t))
         else:
             dur = len(s["voice"].split()) / WORDS_PER_SEC + 0.3; missing.append(i)
@@ -109,7 +121,7 @@ def build_timeline(spec_path: Path) -> dict:
             "scenes": scenes, "subs": subs, "_audio": [(str(a), s) for a, s in audio], "_missing_voice": missing}
 
 
-def mix_audio(timeline: dict, out: Path, music: Path | None, music_volume: float = 0.12) -> None:
+def mix_audio(timeline: dict, out: Path, music: Path | None, music_volume: float = 0.22) -> None:
     total = timeline["total"]; inputs = []; filters = []; labels = []
     for k, (clip, start) in enumerate(timeline["_audio"]):
         inputs += ["-i", clip]; ms = int(start * 1000)
@@ -122,9 +134,15 @@ def mix_audio(timeline: dict, out: Path, music: Path | None, music_volume: float
     if not labels:
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", str(total), str(out)], check=True)
         return
-    filters.append("".join(labels) + f"amix=inputs={len(labels)}:normalize=0:duration=longest,apad,atrim=0:{total}[a]")
+    if music and len(labels) > 1:
+        vo = "".join(labels[:-1])
+        filters.append(f"{vo}amix=inputs={len(labels) - 1}:normalize=0,apad,atrim=0:{total},asplit[vo][key]")
+        filters.append("[m][key]sidechaincompress=threshold=0.03:ratio=6:attack=20:release=400[md]")
+        filters.append(f"[vo][md]amix=inputs=2:normalize=0,atrim=0:{total},loudnorm=I=-14:TP=-1.5:LRA=11[a]")
+    else:
+        filters.append("".join(labels) + f"amix=inputs={len(labels)}:normalize=0:duration=longest,apad,atrim=0:{total},loudnorm=I=-14:TP=-1.5:LRA=11[a]")
     subprocess.run(["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", ";".join(filters), "-map", "[a]",
-                    "-ac", "2", "-c:a", "aac", "-b:a", "192k", str(out)], check=True)
+                    "-ar", "48000", "-ac", "2", "-c:a", "aac", "-b:a", "192k", str(out)], check=True)
 
 
 def make_reel(spec_path: Path, out: Path, music: Path | None = None) -> dict:
@@ -141,6 +159,6 @@ def make_reel(spec_path: Path, out: Path, music: Path | None = None) -> dict:
 if __name__ == "__main__":
     import sys
     spec = Path(sys.argv[1]); out = Path(sys.argv[2])
-    music = Path(sys.argv[3]) if len(sys.argv) > 3 else None
+    music = Path(sys.argv[3]) if len(sys.argv) > 3 else (MUSIC if MUSIC.exists() else None)
     tl = make_reel(spec, out, music)
     print(f"✓ {out}  ({tl['total']:.1f}s)  scenes without voice: {tl['_missing_voice'] or 'none'}")
