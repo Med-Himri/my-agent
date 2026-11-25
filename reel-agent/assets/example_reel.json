@@ -1,0 +1,165 @@
+{
+ "topic": "لماذا تهتز دواسة الفرامل؟ نظام ABS",
+ "caption": "هل شعرت يومًا باهتزاز دوّاسة الفرامل عند الفرملة القويّة؟ 🤔\nلا تقلق، هذا نظام ABS يقوم بعمله ويحميك من الانزلاق.\n\nاحفظ الفيديو وشاركه مع صديق يسوق 🚗",
+ "hashtags": [
+  "#ميدلوت_أوتو",
+  "#ABS",
+  "#فرامل",
+  "#سيارات",
+  "#نصائح_السيارات",
+  "#ميكانيك",
+  "#السلامة_المرورية",
+  "#cars",
+  "#carcare",
+  "#medloutauto"
+ ],
+ "scenes": [
+  {
+   "title": "تهتزّ تحت قدمك؟",
+   "mood": "dark",
+   "voice": "ضغطتَ على الفرامل بقوّة، فشعرتَ بالدوّاسة تهتزّ تحت قدمك؟ لا تقلق، هذا ليس عطلًا!",
+   "image_query": "foot pressing brake pedal car interior",
+   "badge": "",
+   "pills": [
+    {
+     "text": "لا تقلق، ليس عطلًا!",
+     "color": "green",
+     "cue": "لا تقلق"
+    }
+   ]
+  },
+  {
+   "title": "ما هو؟",
+   "mood": "dark",
+   "voice": "إنّه نظام ABS، أي نظام منع انغلاق العجلات.",
+   "image_query": "ABS warning light glowing red",
+   "badge": "",
+   "pills": [
+    {
+     "text": "ABS",
+     "color": "yellow",
+     "cue": "ABS"
+    },
+    {
+     "text": "منع انغلاق العجلات",
+     "color": "red",
+     "cue": "منع"
+    }
+   ]
+  },
+  {
+   "title": "كيف يعمل؟",
+   "mood": "blue",
+   "voice": "على كلّ عجلة حسّاسٌ صغير، يراقب سرعة دورانها باستمرار.",
+   "image_query": "ABS wheel speed sensor diagram brake disc",
+   "badge": "",
+   "pills": [
+    {
+     "text": "حسّاس على كلّ عجلة",
+     "color": "blue",
+     "cue": "حسّاس"
+    },
+    {
+     "text": "يراقب سرعة الدوران",
+     "color": "white",
+     "cue": "يراقب"
+    }
+   ]
+  },
+  {
+   "title": "كيف يعمل؟",
+   "mood": "blue",
+   "voice": "وعندما تكاد العجلة تنغلق، يخفّف النظام ضغط الفرامل ثمّ يعيده، حتّى خمس عشرة مرّة في الثانية. وهذا هو الاهتزاز الذي تشعر به.",
+   "image_query": "ABS wheel speed sensor diagram brake disc",
+   "badge": "",
+   "pills": [
+    {
+     "text": "يخفّف الضغط ثمّ يعيده",
+     "color": "yellow",
+     "cue": "يخفّف"
+    },
+    {
+     "text": "15 مرّة في الثانية",
+     "color": "red",
+     "cue": "خمس عشرة"
+    }
+   ]
+  },
+  {
+   "title": "الفائدة",
+   "mood": "green",
+   "voice": "الفائدة؟ تبقى قادرًا على توجيه السيارة أثناء الفرملة القويّة، وتتفادى الانزلاق، خاصّة على الطريق المبلّل.",
+   "image_query": "car braking wet road water splash",
+   "badge": "",
+   "pills": [
+    {
+     "text": "تتحكّم في المقود",
+     "color": "green",
+     "cue": "توجيه"
+    },
+    {
+     "text": "لا انزلاق",
+     "color": "green",
+     "cue": "الانزلاق"
+    }
+   ]
+  },
+  {
+   "title": "خطأ شائع",
+   "mood": "red",
+   "voice": "الخطأ الشائع؟ أن ترفع قدمك عندما تشعر بالاهتزاز. الصحيح: اضغط بقوّة وثبات، ووجّه السيارة.",
+   "image_query": "",
+   "badge": "",
+   "pills": [
+    {
+     "text": "لا ترفع قدمك",
+     "color": "red",
+     "cue": "ترفع"
+    },
+    {
+     "text": "اضغط بقوّة وثبات",
+     "color": "green",
+     "cue": "اضغط"
+    },
+    {
+     "text": "ووجّه السيارة",
+     "color": "yellow",
+     "cue": "ووجّه"
+    }
+   ]
+  },
+  {
+   "title": "نصيحة مهمّة",
+   "mood": "gray",
+   "voice": "وإذا أضاء ضوء ABS في لوحة العدّادات، فالنظام متوقّف، والفرامل العاديّة تعمل وحدها. افحصه في أقرب وقت.",
+   "image_query": "ABS warning light car dashboard",
+   "badge": "",
+   "pills": [
+    {
+     "text": "ضوء ABS مُضاء؟",
+     "color": "yellow",
+     "cue": "أضاء"
+    },
+    {
+     "text": "افحصه في أقرب وقت",
+     "color": "red",
+     "cue": "افحصه"
+    }
+   ]
+  },
+  {
+   "title": "تابعنا",
+   "mood": "dark",
+   "voice": "تابع ميدلوت أوتو، لتفهم سيارتك أكثر.",
+   "image_query": "",
+   "badge": "ABS",
+   "pills": [
+    {
+     "text": "MEDLOUT AUTO",
+     "color": "yellow",
+     "cue": "ميدلوت"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,8 @@
+services:
+  agent:
+    build: .
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    shm_size: "1gb"        # Chromium needs shared memory for rendering

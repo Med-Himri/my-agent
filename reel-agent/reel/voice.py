@@ -5,6 +5,7 @@ account runs out of credits (or its key stops working), the next key is used.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 
@@ -62,11 +63,15 @@ def speak(text: str, out: Path, previous_text: str = "", next_text: str = "",
     raise OutOfCredits("All ElevenLabs keys are out of credits or invalid:\n" + "\n".join(errors))
 
 
+def clip_path(folder: Path, text: str) -> Path:
+    return folder / "voice" / (hashlib.sha1(text.strip().encode()).hexdigest()[:12] + ".mp3")
+
+
 def voice_reel(scenes: list[dict], folder: Path) -> list[Path]:
-    """Write voice/s1.mp3, s2.mp3, ... for every scene that doesn't have a clip yet."""
+    """Generate a clip for every scene whose exact text has no clip yet (edits reuse unchanged clips)."""
     paths = []
     for i, s in enumerate(scenes):
-        out = folder / "voice" / f"s{i + 1}.mp3"
+        out = clip_path(folder, s["voice"])
         if not out.exists():
             speak(s["voice"], out,
                   previous_text=scenes[i - 1]["voice"] if i else "",

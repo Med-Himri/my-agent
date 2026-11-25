@@ -1,0 +1,5 @@
+data/
+work/
+.env
+__pycache__/
+renderer/node_modules/

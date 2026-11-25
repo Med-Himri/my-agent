@@ -12,6 +12,8 @@ from pathlib import Path
 
 from PIL import Image, ImageEnhance, ImageFilter
 
+from .voice import clip_path
+
 ROOT = Path(__file__).resolve().parent.parent
 GAP = 0.10          # pause between scenes (s)
 TEMPO = 1.12        # speed-up applied to the voice (pitch unchanged)
@@ -87,7 +89,9 @@ def build_timeline(spec_path: Path) -> dict:
     work = base / "build"; work.mkdir(exist_ok=True)
     t = 0.0; scenes = []; subs = []; audio = []; missing = []
     for i, s in enumerate(spec["scenes"], 1):
-        clip = base / "voice" / f"s{i}.mp3"
+        clip = clip_path(base, s["voice"])
+        if not clip.exists():                       # older test reels used s1.mp3, s2.mp3, ...
+            clip = base / "voice" / f"s{i}.mp3"
         if clip.exists():
             clip = tighten_voice(clip, work / f"voice_s{i}.wav")
             dur = duration(clip); audio.append((clip, t))
@@ -95,6 +99,10 @@ def build_timeline(spec_path: Path) -> dict:
             dur = len(s["voice"].split()) / WORDS_PER_SEC + 0.3; missing.append(i)
         sc = {"title": s["title"], "mood": s.get("mood", "dark"), "start": t, "dur": dur, "end": t + dur + GAP,
               "badge": s.get("badge"), "image": None, "bg_image": None, "fit": "cover"}
+        if s.get("badge") and not s.get("image"):
+            sc["badge"] = s["badge"]
+        else:
+            sc["badge"] = None
         if s.get("image"):
             sc["image"], sc["bg_image"], sc["fit"] = prepare_image(base / s["image"], work)
             if sc["fit"] == "contain":      # white diagrams: use the mood gradient, not a gray blur
