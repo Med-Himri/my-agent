@@ -39,8 +39,8 @@ def _choose_images(spec: dict, folder: Path, old: dict | None = None) -> None:
 
 
 def _build(spec: dict, folder: Path) -> Path:
+    (folder / "reel.json").write_text(json.dumps(spec, ensure_ascii=False, indent=1))   # saved first: a retry resumes here
     voice.voice_reel(spec["scenes"], folder)
-    (folder / "reel.json").write_text(json.dumps(spec, ensure_ascii=False, indent=1))
     out = folder / "reel.mp4"
     video.make_reel(folder / "reel.json", out, config.MUSIC if config.MUSIC.exists() else None)
     shutil.rmtree(folder / "build", ignore_errors=True)
@@ -49,6 +49,10 @@ def _build(spec: dict, folder: Path) -> Path:
 
 def produce(topic: dict, folder: Path) -> tuple[Path, dict]:
     folder.mkdir(parents=True, exist_ok=True)
+    saved = folder / "reel.json"
+    if saved.exists():                    # an earlier attempt already wrote the script and chose images: resume
+        spec = json.loads(saved.read_text())
+        return _build(spec, folder), spec
     spec = brain.write_script(topic)
     spec["brand"] = config.BRAND
     _choose_images(spec, folder)
