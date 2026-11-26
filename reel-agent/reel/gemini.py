@@ -21,7 +21,7 @@ def models() -> list[str]:
 
 
 def generate_json(system: str, parts: list[dict], schema: dict, temperature: float = 0.8,
-                  max_attempts: int = 6) -> dict:
+                  max_attempts: int = 6, timeout: int = 120, wait: int = 10) -> dict:
     """Ask Gemini for JSON matching `schema`. Tries fallback models and waits on 429/503."""
     key = os.environ.get("GEMINI_API_KEY", "")
     if not key:
@@ -38,13 +38,13 @@ def generate_json(system: str, parts: list[dict], schema: dict, temperature: flo
         model = models()[min(attempt // 2, len(models()) - 1)]       # 2 tries per model
         try:
             r = requests.post(f"{API}/{model}:generateContent", headers={"x-goog-api-key": key},
-                              json=body, timeout=120)
+                              json=body, timeout=timeout)
         except requests.RequestException as e:
             errors.append(f"{model}: {e}"); time.sleep(5); continue
         if r.status_code in (429, 500, 503, 504):
             msg = r.json().get("error", {}).get("message", r.text)[:150] if r.content else r.status_code
             errors.append(f"{model}: {r.status_code} {msg}")
-            time.sleep(min(60, 10 * (attempt + 1)))
+            time.sleep(min(60, wait * (attempt + 1)))
             continue
         if not r.ok:
             raise GeminiError(f"{model}: {r.status_code} {r.text[:400]}")

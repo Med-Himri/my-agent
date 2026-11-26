@@ -280,7 +280,7 @@ def _gemini_pick_images(scenes: list[dict], candidates: dict[int, list[Path]]) -
             b = _img_block(p, 512)["source"]
             parts.append({"inline_data": {"mime_type": b["media_type"], "data": b["data"]}})
         try:
-            ans = gemini.generate_json("", parts, PICK_SCHEMA, temperature=0.2, max_attempts=3)
+            ans = gemini.generate_json("", parts, PICK_SCHEMA, temperature=0.2, max_attempts=2, timeout=60, wait=5)
             out.update(_apply_picks(ans, {i: paths}))
         except gemini.GeminiError:
             out[i] = paths[0]
