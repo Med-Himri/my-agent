@@ -27,6 +27,8 @@ TIMEZONE = env("TIMEZONE", "Africa/Casablanca")
 DAILY_TIME = env("DAILY_TIME", "09:00")          # when topic ideas are sent to Telegram
 TOPICS_PER_DAY = int(env("TOPICS_PER_DAY", "4"))
 
+# Which AI writes the reels: "gemini" (Google, free tier) or "anthropic" (Claude, paid API)
+LLM_PROVIDER = (env("LLM_PROVIDER") or ("gemini" if env("GEMINI_API_KEY") and not env("ANTHROPIC_API_KEY") else "anthropic")).lower()
 MODEL = env("CLAUDE_MODEL", "claude-opus-5-5")
 
 TELEGRAM_TOKEN = env("TELEGRAM_BOT_TOKEN")

@@ -1,4 +1,8 @@
-"""Everything that needs Claude: finding topics, writing scripts, revising them, choosing images."""
+"""Everything that needs an AI model: finding topics, writing scripts, revising them, choosing images.
+
+LLM_PROVIDER=anthropic uses Claude (web search built in); LLM_PROVIDER=gemini uses Google Gemini
+(free tier) with Google results from Serper.dev for research.
+"""
 from __future__ import annotations
 
 import base64
@@ -9,7 +13,7 @@ from pathlib import Path
 import anthropic
 from PIL import Image
 
-from . import config
+from . import config, gemini, websearch
 
 BETAS = ["server-side-fallback-2026-07-01"]   # if a request is declined, the API retries it on a fallback model
 _client: anthropic.Anthropic | None = None
@@ -109,7 +113,7 @@ Here is a reel the account owner approved; match its tone, pacing and density:
 """
 
 
-def find_topics(n: int, avoid: list[str]) -> list[dict]:
+def _claude_find_topics(n: int, avoid: list[str]) -> list[dict]:
     """Research today's topic ideas with web search. Returns up to n topic dicts."""
     avoid_txt = "\n".join(f"- {t}" for t in avoid[-80:]) or "(none yet)"
     prompt = f"""Find {n} strong topics for today's reels on this account. Niche: {config.NICHE}.
@@ -143,21 +147,25 @@ When you are done, call submit_topics once with exactly {n} topics."""
     raise ClaudeError("Claude did not submit topics")
 
 
-def write_script(topic: dict) -> dict:
-    prompt = f"""Write the reel for this approved topic.
+def _script_prompt(topic: dict) -> str:
+    return f"""Write the reel for this approved topic.
 
 Title: {topic['title_ar']}
 Summary: {topic.get('summary_ar', '')}
 Key points to cover: {topic.get('angle', '')}
 
 Return the complete reel JSON."""
+
+
+def _claude_write_script(topic: dict) -> dict:
+    prompt = _script_prompt(topic)
     r = _create(max_tokens=16000, system=STYLE_GUIDE, messages=[{"role": "user", "content": prompt}],
                 thinking={"type": "adaptive"},
                 output_config={"effort": "high", "format": {"type": "json_schema", "schema": REEL_SCHEMA}})
     return _json_answer(r)
 
 
-def revise_script(spec: dict, feedback: str) -> dict:
+def _revise_prompt(spec: dict, feedback: str) -> str:
     current = {k: spec[k] for k in ("topic", "caption", "hashtags")}
     current["scenes"] = [{k: s.get(k, "") for k in ("title", "mood", "voice", "image_query", "badge", "pills")}
                          for s in spec["scenes"]]
@@ -170,15 +178,20 @@ The account owner reviewed the video and asks for this change:
 Apply the change and return the complete updated reel JSON. Change only what the request needs:
 keep every other scene's voice text and image_query exactly the same (unchanged scenes reuse their audio and images).
 If the owner asks for a different picture in a scene, write a new, different image_query for that scene."""
+    return prompt
+
+
+def _claude_revise_script(spec: dict, feedback: str) -> dict:
+    prompt = _revise_prompt(spec, feedback)
     r = _create(max_tokens=16000, system=STYLE_GUIDE, messages=[{"role": "user", "content": prompt}],
                 thinking={"type": "adaptive"},
                 output_config={"effort": "high", "format": {"type": "json_schema", "schema": REEL_SCHEMA}})
     return _json_answer(r)
 
 
-def _img_block(path: Path) -> dict:
+def _img_block(path: Path, size: int = 768) -> dict:
     im = Image.open(path).convert("RGB")
-    im.thumbnail((768, 768))
+    im.thumbnail((size, size))
     buf = io.BytesIO(); im.save(buf, "JPEG", quality=80)
     return {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
                                         "data": base64.standard_b64encode(buf.getvalue()).decode()}}
@@ -190,27 +203,106 @@ PICK_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["ch
                    "properties": {"scene": {"type": "integer"}, "image": {"type": "integer"}}}}}}
 
 
-def pick_images(scenes: list[dict], candidates: dict[int, list[Path]]) -> dict[int, Path | None]:
+PICK_INSTRUCTIONS = ("You are choosing pictures for an Instagram reel. For each scene below, pick the candidate image that best "
+        "shows what the narrator says. Prefer sharp, well-lit, uncluttered images; real photos or clean diagrams. "
+        "Reject images with visible watermarks (getty, istock, shutterstock, alamy...), big overlaid text, logos of "
+        "shops, collages, low resolution, or anything off-topic. Return image = -1 if none is acceptable.")
+
+
+def _scene_label(scenes: list[dict], i: int) -> str:
+    s = scenes[i]
+    return f"\n## Scene {i}: {s['title']}\nNarration: {s['voice']}\nSearch: {s['image_query']}"
+
+
+def _claude_pick_images(scenes: list[dict], candidates: dict[int, list[Path]]) -> dict[int, Path | None]:
     """Show Claude the candidate photos for each scene; it returns the best one (or none) per scene."""
     if not candidates:
         return {}
-    content: list[dict] = [{"type": "text", "text":
-        "You are choosing pictures for an Instagram reel. For each scene below, pick the candidate image that best "
-        "shows what the narrator says. Prefer sharp, well-lit, uncluttered images; real photos or clean diagrams. "
-        "Reject images with visible watermarks (getty, istock, shutterstock, alamy...), big overlaid text, logos of "
-        "shops, collages, low resolution, or anything off-topic. Return image = -1 if none is acceptable."}]
+    content: list[dict] = [{"type": "text", "text": PICK_INSTRUCTIONS}]
     for i, paths in candidates.items():
-        s = scenes[i]
-        content.append({"type": "text", "text": f"\n## Scene {i}: {s['title']}\nNarration: {s['voice']}\nSearch: {s['image_query']}"})
+        content.append({"type": "text", "text": _scene_label(scenes, i)})
         for k, p in enumerate(paths):
             content.append({"type": "text", "text": f"Scene {i}, image {k}:"})
             content.append(_img_block(p))
     r = _create(max_tokens=4000, messages=[{"role": "user", "content": content}],
                 thinking={"type": "adaptive"},
                 output_config={"effort": "low", "format": {"type": "json_schema", "schema": PICK_SCHEMA}})
+    return _apply_picks(_json_answer(r), candidates)
+
+
+def _apply_picks(answer: dict, candidates: dict[int, list[Path]]) -> dict[int, Path | None]:
     out: dict[int, Path | None] = {i: None for i in candidates}
-    for c in _json_answer(r)["choices"]:
+    for c in answer["choices"]:
         i, k = c["scene"], c["image"]
         if i in candidates and 0 <= k < len(candidates[i]):
             out[i] = candidates[i][k]
     return out
+
+
+# ------------------------------------------------------------------ Gemini
+def _gemini_find_topics(n: int, avoid: list[str]) -> list[dict]:
+    avoid_txt = "\n".join(f"- {t}" for t in avoid[-80:]) or "(none yet)"
+    digest = websearch.research_digest()
+    prompt = f"""Propose {n} strong topics for today's reels on this account. Niche: {config.NICHE}.
+
+Below are fresh Google search and news results about cars (Morocco and worldwide). Use them to see what drivers are
+asking about and what is happening now (seasonal issues, common faults, new technology, viral questions).
+Good topics are concrete and explainable in under a minute with pictures (one system, one warning light, one habit),
+and useful or surprising to ordinary drivers. Mix evergreen explainers with at least one timely topic.
+Only propose topics whose facts you are confident about.
+
+Do not repeat or closely resemble these earlier topics:
+{avoid_txt}
+
+Search results:
+{digest}
+
+Return exactly {n} topics."""
+    data = gemini.generate_json(STYLE_GUIDE, [{"text": prompt}], TOPICS_TOOL["input_schema"], temperature=1.0)
+    return data["topics"][:n]
+
+
+def _gemini_write_script(topic: dict) -> dict:
+    return gemini.generate_json(STYLE_GUIDE, [{"text": _script_prompt(topic)}], REEL_SCHEMA)
+
+
+def _gemini_revise_script(spec: dict, feedback: str) -> dict:
+    return gemini.generate_json(STYLE_GUIDE, [{"text": _revise_prompt(spec, feedback)}], REEL_SCHEMA, temperature=0.4)
+
+
+def _gemini_pick_images(scenes: list[dict], candidates: dict[int, list[Path]]) -> dict[int, Path | None]:
+    """One small request per scene (free tier friendly). If Gemini is unavailable, use Google's top result."""
+    out: dict[int, Path | None] = {}
+    for i, paths in candidates.items():
+        parts: list[dict] = [{"text": PICK_INSTRUCTIONS}, {"text": _scene_label(scenes, i)}]
+        for k, p in enumerate(paths):
+            parts.append({"text": f"Scene {i}, image {k}:"})
+            b = _img_block(p, 512)["source"]
+            parts.append({"inline_data": {"mime_type": b["media_type"], "data": b["data"]}})
+        try:
+            ans = gemini.generate_json("", parts, PICK_SCHEMA, temperature=0.2, max_attempts=3)
+            out.update(_apply_picks(ans, {i: paths}))
+        except gemini.GeminiError:
+            out[i] = paths[0]
+    return out
+
+
+# ------------------------------------------------------------------ public API
+def _use_gemini() -> bool:
+    return config.LLM_PROVIDER == "gemini"
+
+
+def find_topics(n: int, avoid: list[str]) -> list[dict]:
+    return _gemini_find_topics(n, avoid) if _use_gemini() else _claude_find_topics(n, avoid)
+
+
+def write_script(topic: dict) -> dict:
+    return _gemini_write_script(topic) if _use_gemini() else _claude_write_script(topic)
+
+
+def revise_script(spec: dict, feedback: str) -> dict:
+    return _gemini_revise_script(spec, feedback) if _use_gemini() else _claude_revise_script(spec, feedback)
+
+
+def pick_images(scenes: list[dict], candidates: dict[int, list[Path]]) -> dict[int, Path | None]:
+    return _gemini_pick_images(scenes, candidates) if _use_gemini() else _claude_pick_images(scenes, candidates)
